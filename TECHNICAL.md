@@ -243,36 +243,38 @@ The exported Markdown files include YAML front matter that can specify authors, 
 **Authors only:**
 ```yaml
 ---
-title: "Title of the Work"
-year: 2023
-author-1: "[[Author One]]"
-author-2: "[[Author Two]]"
-citation-key: "CitationKey2023"
-highlights:
+title: Title
+year: 0000
+author-1: "[[First Name Last Name]]"
+author-2: "[[First Name Last Name]]"
+citation-key: "[[@Key]]"
+highlights: 000
 ---
 ```
 
 **Editors only:**
 ```yaml
 ---
-title: "Title of the Work"
-year: 2023
-editor-1: "[[Editor One]]"
-editor-2: "[[Editor Two]]"
-citation-key: "CitationKey2023"
-highlights:
+title: Title
+year: 0000
+editor-1: "[[First Name Last Name]]"
+editor-2: "[[First Name Last Name]]"
+citation-key: "[[@Key]]"
+highlights: 000
 ---
 ```
 
 **Both authors and editors:**
 ```yaml
 ---
-title: "Title of the Work"
-year: 2023
-author-1: "[[Author One]]"
-editor-1: "[[Editor One]]"
-citation-key: "CitationKey2023"
-highlights:
+title: Title
+year: 0000
+author-1: "[[First Name Last Name]]"
+author-2: "[[First Name Last Name]]"
+editor-1: "[[First Name Last Name]]"
+editor-2: "[[First Name Last Name]]"
+citation-key: "[[@Key]]"
+highlights: 000
 ---
 ```
 

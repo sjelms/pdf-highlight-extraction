@@ -24,14 +24,15 @@ def load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase:
     return bib_database
 
 def get_authors_from_entry(entry: Dict[str, Any]) -> List[str]:
-    """Extracts a list of author last names from a BibTeX entry."""
+    """Extracts a list of author full names from a BibTeX entry."""
     authors = []
     if 'author' in entry:
         for author_name in entry['author'].split(' and '):
-            parts = author_name.split(',')
-            if len(parts) > 0:
-                last_name = parts[0].strip()
-                authors.append(last_name)
+            parts = [p.strip() for p in author_name.split(',')]
+            if len(parts) == 2:
+                authors.append(f"{parts[1]} {parts[0]}")
+            else:
+                authors.append(parts[0])
     return authors
 
 def find_bibtex_entry(

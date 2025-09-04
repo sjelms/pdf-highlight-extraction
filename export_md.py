@@ -27,16 +27,17 @@ def create_markdown_export(
 
     with open(output_path, 'w', encoding='utf-8') as md_file:
         # Write YAML front matter
-        md_file.write("---\
+        md_file.write("---
 ")
-        md_file.write(f"title: \"{meta.get('title', '')}\"\n")
+        md_file.write(f"title: \"{meta.get('title', '')}\"
+")
         md_file.write(f"year: {meta.get('year', '')}\n")
         for i, author in enumerate(meta.get('authors', [])):
-            md_file.write(f"author-{i+1}: \"[[{author}]]\"\n")
-        md_file.write(f"citation-key: \"{meta.get('citation_key', '')}\"\n")
-        md_file.write("highlights:\n")
-        md_file.write("---\
-\n")
+            md_file.write(f"author-{i+1}: \"{author}\"\n")
+        md_file.write(f"citation-key: \"[[@{meta.get('citation_key', '')}]]\"\n")
+        md_file.write(f"highlights: {len(annotations)}\n")
+        md_file.write("---
+")
 
         # Write annotations
         for annot in annotations:

@@ -34,6 +34,7 @@ def extract_annotations(pdf_path: str) -> List[Annotation]:
                 rect = annot.rect
                 words = [w for w in wordlist if fitz.Rect(w[:4]).intersects(rect)]
                 highlighted_text = " ".join(w[4] for w in words)
+                print(highlighted_text)
 
                 # Get annotation note (comment)
                 info = annot.info
