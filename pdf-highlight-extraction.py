@@ -11,6 +11,7 @@ from export_md import create_markdown_export
 
 def main():
     """Main function to run the pipeline."""
+    parser = argparse.ArgumentParser()
     parser.add_argument("pdf_path", help="The path to the PDF file to process.")
     parser.add_argument("--project-dir", default=".", help="The root directory of the project.")
     args = parser.parse_args()

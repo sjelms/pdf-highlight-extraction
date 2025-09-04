@@ -220,3 +220,5 @@ __marimo__/
 # macOS resource forks
 __MACOSX/
 
+# Gemini Logs
+gemini_log.txt

@@ -3,6 +3,7 @@ Orchestrates the extraction, enrichment, and export of annotations to an enriche
 """
 import json
 import os
+import fitz
 from typing import List, Dict, Any
 
 from annotations import extract_annotations, Annotation
@@ -73,6 +74,3 @@ def create_enriched_json(
         json.dump(enriched_data, f, indent=4)
 
     print(f"Successfully exported enriched JSON to {output_path}")
-
-# We need to import fitz for this to work
-import fitz
