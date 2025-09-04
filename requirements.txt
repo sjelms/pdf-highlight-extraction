@@ -1,0 +1,5 @@
+PyMuPDF
+pydantic
+bibtexparser
+thefuzz[speedup]
+PyYAML

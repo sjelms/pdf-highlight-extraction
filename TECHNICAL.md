@@ -54,6 +54,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+#### Required Python Packages from requirements.txt
+- PyMuPDF
+- pydantic
+- bibtexparser
+- thefuzz[speedup]
+- PyYAML
+
+
 ### 3. Configure Paths
 
 - Edit `config.yaml` to specify:

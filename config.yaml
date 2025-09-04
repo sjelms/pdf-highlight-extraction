@@ -1,0 +1,13 @@
+# Configuration for pdf-highlight-extraction
+
+# Path to the BibTeX file
+bibtex_path: "paperpile.bib"
+
+# Directory to save the intermediate JSON files
+json_output_dir: "output/json"
+
+# Directory to save the CSV files
+csv_output_dir: "output/csv"
+
+# Directory to save the Markdown files
+md_output_dir: "output/md"
