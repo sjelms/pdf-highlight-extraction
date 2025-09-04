@@ -236,9 +236,52 @@ Each row corresponds to one annotation, enriched with metadata for seamless impo
 - Formatting placeholders allow for future styling and linking.
 - Markdown is compatible with note-taking apps such as Obsidian.
 
+### BibTeX entry types
+- `@article` Used for articles in journals, magazines, or other periodicals.  
+- `@book` For citing a complete book with an identifiable publisher.  
+- `@booklet` For printed, bound works without a named publisher or sponsoring institution.  
+- `@conference` For papers presented at a conference, often interchangeable with `@inproceedings`.  
+- `@inbook` To cite a specific part of a book, such as a chapter or a range of pages.  
+- `@incollection` For a section of a book that has its own title.  
+- `@inproceedings` Used for papers published in conference proceedings.  
+- `@manual` For citing software manuals or guides.  
+- `@mastersthesis` For Master's theses.  
+- `@misc` For resources that don't fit into other categories, such as websites.  
+- `@phdthesis` For PhD theses.  
+- `@techreport` For technical reports.  
+
+
 ### YAML Header Variants
 
-The exported Markdown files include YAML front matter that can specify authors, editors, or both, using standardized keys such as `author`, `authors`, `editor`, or `editors`. This facilitates integration with note-taking systems that parse YAML metadata.
+The exported Markdown files include bibliographic metadata YAML front matter that can specify authors, editors, or both, using standardized keys such as `author`, `authors`, `editor`, or `editors`. This facilitates integration with note-taking systems that parse YAML metadata and ensures proper linkage in Obsidian and consistency with BibTeX references.
+
+**Notes:**
+- **Title and year**
+  - `title:` and `year:` fields are plain text
+  - Do **not** enclose in quotes or brackets unless the title contains special characters that break YAML parsing
+- **Citation key**
+  - The `citation-key` field corresponds to the BibTeX entry key matched during processing
+  - Must be preserved in the format `"[[ @Key ]]"` within YAML
+- **Author and editor fields**
+  - Use `author-n` and `editor-n`, numbered sequentially
+  - Each name is formatted as `"[[FirstName LastName]]"`
+  - All Obsidian wikilinks in YAML must be enclosed in **quotes** and **double brackets**
+- **BibTeX entry type**
+  - Convert BibTeX entry type into a tag for YAML
+  - Remove the `@` and replace with `#`
+  - Append `-pdf` to the type
+  - Example: BibTeX type `@article` becomes `#article-pdf`
+- **Highlights count**
+  - The `highlights:` field must contain the integer count of highlights in the file (no quotes)
+- **Add `aliases:` field to citation YAML**
+  - Add the **full title** and an optional **short title** (if detected)
+  - Example:
+    ```yaml
+    aliases:
+      - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
+      - A Better Future
+    ```
+---
 
 **Authors only:**
 ```yaml
@@ -249,6 +292,10 @@ author-1: "[[First Name Last Name]]"
 author-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
+type: #article-pdf
+aliases:
+      - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
+      - A Better Future
 ---
 ```
 
@@ -261,6 +308,10 @@ editor-1: "[[First Name Last Name]]"
 editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
+type: #book-pdf
+aliases:
+      - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
+      - A Better Future
 ---
 ```
 
@@ -275,12 +326,14 @@ editor-1: "[[First Name Last Name]]"
 editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
+type: #incollection-pdf
+aliases:
+      - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
+      - A Better Future
 ---
 ```
 
-**Notes:**
-- The `citation-key` field corresponds to the BibTeX entry key matched during processing and must be preserved in the format `[[@CitationKey]]` within the text when referenced.
-- The `author-n` and `editor-n` fields are numbered sequentially and use double square brackets for linking (e.g., `[[Author Name]]`), supporting Obsidian's linking syntax.
+
 
 ### Highlight Formatting Rules
 
