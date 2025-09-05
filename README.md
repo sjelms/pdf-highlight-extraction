@@ -1,83 +1,90 @@
 # pdf-highlight-extraction
 
-A Python tool to extract highlighted text from PDF documents using the PyMuPDF library (fitz). This project enables users to programmatically retrieve text annotations, their positions, and metadata from PDFs for further analysis or processing.
+Extract, enrich, and export PDF highlights to Readwise-ready CSV and Markdown with BibTeX-powered metadata.
 
-## Requirements
+## Overview
 
-- Python 3.7+
-- PyMuPDF (`fitz`) library
+This tool parses highlight annotations from PDFs, matches them to entries in a BibTeX file, and generates:
+- Readwise-ready CSV files
+- Rich Markdown notes with YAML front matter
 
-Install dependencies with:
-
-```bash
-pip install pymupdf
-```
+The pipeline’s single source of truth is an enriched JSON file per PDF that combines raw annotations with normalized bibliographic metadata.
 
 ## Features
 
-- Extract highlighted text from PDF files
-- Retrieve annotation coordinates and page information
-- Support for multiple highlights per page
-- Export highlights to **Readwise-ready CSV** and **Markdown** files
+- Quad-based highlight extraction using PyMuPDF (reliable text capture from highlighted quadpoints)
+- BibTeX integration with fuzzy title/author matching and normalization
+- Robust author/editor parsing (supports “Last, First” format, multiline `and` separators, initials, and multi-part surnames like “LaScola Needy”)
+- Markdown export with Obsidian-friendly YAML front matter, aliases, and color tags
+- Readwise CSV export following the official template
+- Deterministic output naming using citation key and type (e.g., `Assaad2022-zl article-pdf.md`)
 
-## How It Works
+## Requirements
 
-1. Open the PDF document using PyMuPDF.
-2. Iterate through each page and find highlight annotations.
-3. For each highlight, obtain the coordinates and extract the corresponding text.
-4. Collect and output all highlights with their metadata.
+- Python 3.9+
+- Packages in `requirements.txt`
 
-6. Export the collected highlights into both CSV (formatted for Readwise import) and Markdown (for use in Obsidian or other note apps).
+## Setup
 
-### CSV Export Details
-
-The exported CSV file follows the [Readwise CSV import template](https://readwise.io/csv_template). The CSV includes the following seven required columns:
-
-1. **Title** – The title of the source document (e.g., the PDF file name or document title).
-2. **Author** – The author(s) of the document.
-3. **Category** – Type of source, typically "books", "articles", or "supplementals".
-4. **Source URL** – A URL to the source document, if available (can be blank for local PDFs).
-5. **Highlight** – The highlighted text extracted from the PDF.
-6. **Note** – Any note or comment associated with the highlight (can be blank if not present).
-7. **Location** – The location of the highlight within the document (e.g., page number or coordinates).
-
-#### Field Mapping: PDF Annotations to Readwise CSV
-
-| Readwise CSV Field | PDF Annotation Source            |
-|--------------------|----------------------------------|
-| Title              | PDF metadata title or file name   |
-| Author             | PDF metadata author               |
-| Category           | User-specified or default ("books")|
-| Source URL         | User-specified or blank           |
-| Highlight          | Highlighted text from annotation  |
-| Note               | Annotation comment or blank       |
-| Location           | Page number and/or annotation position |
-
-## Example Usage
-
-```python
-import fitz
-
-doc = fitz.open("sample.pdf")
-for page in doc:
-    for annot in page.annots():
-        if annot.type[0] == 8:  # Highlight annotation
-            info = annot.info
-            quads = annot.vertices
-            text = page.get_textbox(annot.rect)
-            print(f"Page {page.number + 1}: {text}")
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Example output:
+## Configure
 
+Edit `config.yaml` to set paths relative to the project root:
+- `bibtex_path`: path to your BibTeX file (e.g., `paperpile.bib`)
+- `json_output_dir`: directory for enriched JSON
+- `csv_output_dir`: directory for Readwise CSV
+- `md_output_dir`: directory for Markdown
+
+## Usage
+
+```bash
+python pdf-highlight-extraction.py \
+  "/absolute/path/to/your.pdf" \
+  [--output-dir /tmp/exports] [--no-csv] [--no-md]
 ```
-Page 2: This is a highlighted text from the PDF.
-Page 5: Another highlight extracted successfully.
-```
 
-## Roadmap
+- Provide an absolute path to the PDF.
+- If `--output-dir` is omitted, outputs go to folders specified in `config.yaml`.
+- Filenames use: `"<citation-key> <entry-type>-pdf.<ext>"`; when no BibTeX match, fall back to the PDF base name.
 
-- Full support for exporting annotations into Readwise CSV template  
-- Markdown export of highlights with customizable formatting
-- Integrate with GUI tools for easier PDF selection
-- Improve text extraction accuracy for complex layouts
+## Output Details
+
+### Enriched JSON
+- `meta` includes: `title`, `short_title`, `year`, `entry_type`, `citation_key`, `authors`, `editors`, `doi`, `url`.
+- `data` is a list of annotations: `text`, `page_number`, `color`, `note`.
+
+### Markdown
+- YAML front matter: title, year, `author-n` / `editor-n`, `citation-key`, `highlights`, `type`, and `aliases` (full and short title).
+- Each highlight renders as a bullet with page and optional color tag.
+- Color→tag mapping (default):
+  - `#b9e8b9` → `#important-pdf`
+  - `#c3e1f8` → `#reference-note-pdf`
+  - `#f0bbcd` → `#secondary-pdf`
+  - `#f9e196` → `#general-pdf`
+
+### CSV (Readwise)
+
+Columns (in order): `Title, Author, Category, Source URL, Highlight, Note, Location`
+
+- `Title`: BibTeX title → PDF metadata title → filename fragment
+- `Author`: BibTeX authors joined with comma
+- `Category`: defaults to `articles`
+- `Source URL`: `https://doi.org/<doi>` → BibTeX `url` → blank
+- `Highlight`: annotation text (single-line; internal newlines collapsed)
+- `Note`: annotation comment
+- `Location`: `Page <n>`
+
+## Notes & Troubleshooting
+
+- If highlight text is empty, ensure annotations are highlight-type and the PDF isn’t scanned; quad-based extraction is used by default.
+- Author parsing relies on BibTeX `author` / `editor` fields. For mismatches, confirm the BibTeX entry and citation key.
+- Outputs require the PDF path to be absolute when invoking the script.
+
+## Related Docs
+
+- See `TECHNICAL.md` for a detailed specification and changelog.

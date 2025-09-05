@@ -149,7 +149,7 @@ from pydantic import BaseModel
 
 class Annotation(BaseModel):
     text: str
-    page: int
+    page_number: int
     color: Optional[str] = None
     note: Optional[str] = None
 
@@ -271,7 +271,7 @@ author-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
 type: "#article-pdf"
-alias:
+aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
 ---
@@ -287,7 +287,7 @@ editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
 type: "#book-pdf"
-alias:
+aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
 ---
@@ -305,7 +305,7 @@ editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
 type: "#incollection-pdf"
-alias:
+aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
 ---
@@ -398,6 +398,19 @@ Testing is planned as a future enhancement. When implemented, it will include:
 ## Future Enhancements
 
 - Consolidate multiple PDFs into a single CSV export.
+
+---
+
+## Changelog
+
+- 2025-09-05
+  - Highlight extraction: switched to quad-based clipping for highlight text (use annotation vertices/quads, sort rects top-to-bottom then left-to-right, fallback to annotation rect). Cleans single newlines to spaces; preserves paragraph breaks. Result: populated `data[].text` in JSON and non-empty Markdown bullets.
+  - Color capture: prefer stroke color with fallback to fill; convert RGB floats to hex (e.g., `#f0bbcd`).
+  - Author/editor parsing: robust BibTeX name handling. Split on `and` across lines, support "Last, First" → "First Last", preserve multi-part last names (e.g., "LaScola Needy"), strip braces, and normalize initials (e.g., `H.` → `H`). Produces full names such as "Makarand Hastak" and "Kim LaScola Needy".
+  - PDF metadata authors: more robust fallback split on commas, semicolons, or the word `and` to improve matching when BibTeX is unavailable.
+  - Impact: export formats unchanged; CSV/Markdown now include correct author lists and actual highlight text.
+
+Files affected: `annotations.py`, `bib.py`, `export_json.py`.
 - Incorporate DOI lookup APIs for enhanced metadata fetching.
 - Implement color mapping for highlight types.
 - Add deduplication logic for repeated highlights.
@@ -454,7 +467,7 @@ python pdf-highlight-extraction.py /path/to/your/file.pdf --no-csv
 ### 2. Fix `annotations.py` robustness and text extraction:
 - [x] Safe iteration over `page.annots()`.
 - [x] Remove unused `wordlist` variables.
-- [x] Improve highlight text extraction using `quads`.
+- [x] Improve highlight text extraction by using `annot.get_text("text")`.
 - [x] Defensive `color` handling.
 - [x] Clean up highlight text to remove single newlines.
 

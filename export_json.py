@@ -40,8 +40,12 @@ def create_enriched_json(
     pdf_title = pdf_metadata.get('title', os.path.basename(pdf_path))
     
     # Normalize author names from PDF metadata for better matching
-    pdf_author_str = pdf_metadata.get('author', '')
-    pdf_author_list = [author.strip() for author in pdf_author_str.split(',')]
+    pdf_author_str = pdf_metadata.get('author', '') or ''
+    # Split on common separators: commas, semicolons, or the word 'and'
+    pdf_author_list = [
+        a.strip() for a in re.split(r"\s*(?:,|;|\band\b)\s*", pdf_author_str)
+        if a.strip()
+    ]
 
     bib_entry = find_bibtex_entry(pdf_title, pdf_author_list, bib_database)
 
