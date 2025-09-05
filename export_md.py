@@ -2,7 +2,6 @@
 Handles the export of enriched annotations to a Markdown file.
 """
 import json
-import re
 
 
 def create_markdown_export(
@@ -26,16 +25,10 @@ def create_markdown_export(
         print(f"No annotations found in {json_path}. Skipping Markdown export.")
         return
 
-    # Utility to replace any colon with an en dash surrounded by spaces
-    def _sanitize_title(text: str) -> str:
-        if not text:
-            return text
-        return re.sub(r"\s*:\s*", " – ", text)
-
     with open(output_path, 'w', encoding='utf-8') as md_file:
     # Write YAML front matter
         md_file.write("---\n")
-        _title = _sanitize_title(meta.get('title', ''))
+        _title = meta.get('title', '')
         md_file.write(f'title: "{_title}"\n')
         md_file.write(f"year: {meta.get('year', '')}\n")
 
@@ -61,8 +54,8 @@ def create_markdown_export(
             md_file.write(f'type: "#{entry_type}-pdf"\n')
 
         # Aliases (quote items; they can contain special chars)
-        full_title = _sanitize_title(meta.get('title', ''))
-        short_title = _sanitize_title(meta.get('short_title', ''))
+        full_title = meta.get('title', '')
+        short_title = meta.get('short_title', '')
         if full_title or short_title:
             md_file.write("aliases:\n")
             if full_title:

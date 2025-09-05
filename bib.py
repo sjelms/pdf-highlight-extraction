@@ -23,28 +23,47 @@ def load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase:
         bib_database = bibtexparser.load(bibtex_file, parser=parser)
     return bib_database
 
+import re
+
+def _normalize_initials(name: str) -> str:
+    """
+    Removes periods from initials in a name, e.g., "H." -> "H".
+    """
+    # Replace any single uppercase letter followed by a period with just the letter
+    return re.sub(r'\b([A-Z])\.\b', r'\1', name)
+
 def get_authors_from_entry(entry: Dict[str, Any]) -> List[str]:
-    """Extracts a list of author full names from a BibTeX entry."""
+    """Extracts a list of author full names from a BibTeX entry, normalized."""
     authors = []
     if 'author' in entry:
         for author_name in entry['author'].split(' and '):
             parts = [p.strip() for p in author_name.split(',')]
             if len(parts) == 2:
-                authors.append(f"{parts[1]} {parts[0]}")
+                # "Last, First" --> "First Last"
+                full_name = f"{parts[1]} {parts[0]}"
             else:
-                authors.append(parts[0])
+                # Already "First Last" or similar
+                full_name = parts[0]
+            # Normalize initials by removing periods
+            full_name = _normalize_initials(full_name)
+            authors.append(full_name)
     return authors
 
 def get_editors_from_entry(entry: Dict[str, Any]) -> List[str]:
-    """Extracts a list of editor full names from a BibTeX entry."""
+    """Extracts a list of editor full names from a BibTeX entry, normalized."""
     editors = []
     if 'editor' in entry:
         for editor_name in entry['editor'].split(' and '):
             parts = [p.strip() for p in editor_name.split(',')]
             if len(parts) == 2:
-                editors.append(f"{parts[1]} {parts[0]}")
+                # "Last, First" --> "First Last"
+                full_name = f"{parts[1]} {parts[0]}"
             else:
-                editors.append(parts[0])
+                # Already "First Last" or similar
+                full_name = parts[0]
+            # Normalize initials by removing periods
+            full_name = _normalize_initials(full_name)
+            editors.append(full_name)
     return editors
 
 def find_bibtex_entry(
@@ -91,3 +110,56 @@ def find_bibtex_entry(
                 best_match = entry
 
     return best_match
+
+
+def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extracts and normalizes metadata from a BibTeX entry.
+
+    Normalizations:
+    - title: replace colons with en dashes, collapse whitespace, strip trailing punctuation
+    - short_title: first segment before colon or dash
+    - year: only 4-digit year retained
+    - entry_type: lowercase of ENTRYTYPE
+    - citation_key: ID from BibTeX entry
+    - authors: list of normalized authors
+    - editors: list of normalized editors
+
+    Args:
+        entry: A BibTeX entry dictionary.
+
+    Returns:
+        A dictionary with normalized metadata.
+    """
+    raw_title = entry.get('title', '').strip()
+    # Replace colons with en dashes
+    title = raw_title.replace(':', ' – ')
+    # Collapse multiple whitespace into single space
+    title = re.sub(r'\s+', ' ', title)
+    # Strip trailing punctuation (e.g., periods, commas, colons, semicolons)
+    title = title.rstrip('.,:; ')
+
+    # Derive short_title by splitting on colon or dash and taking first segment
+    short_title_split = re.split(r'[:–-]', raw_title)
+    short_title = short_title_split[0].strip() if short_title_split else title
+
+    # Extract year: keep only 4-digit year if present
+    year = entry.get('year', '')
+    match_year = re.search(r'\b(\d{4})\b', year)
+    year_clean = match_year.group(1) if match_year else year
+
+    entry_type = entry.get('ENTRYTYPE', '').lower()
+    citation_key = entry.get('ID', '')
+
+    authors = get_authors_from_entry(entry)
+    editors = get_editors_from_entry(entry)
+
+    return {
+        'title': title,
+        'short_title': short_title,
+        'year': year_clean,
+        'entry_type': entry_type,
+        'citation_key': citation_key,
+        'authors': authors,
+        'editors': editors,
+    }
