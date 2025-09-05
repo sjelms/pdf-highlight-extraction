@@ -12,44 +12,66 @@ from export_md import create_markdown_export
 
 def main():
     """Main function to run the pipeline."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("pdf_path", help="The path to the PDF file to process.")
-    parser.add_argument("--project-dir", default=".", help="The root directory of the project.")
+    
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="Extract PDF highlights and export to various formats.")
+    parser.add_argument("pdf_path", help="The absolute path to the PDF file to process.")
+    parser.add_argument("--output-dir", help="Directory to save output files. Overrides config.yaml.")
+    parser.add_argument("--no-csv", action="store_true", help="Disable CSV export.")
+    parser.add_argument("--no-md", action="store_true", help="Disable Markdown export.")
     args = parser.parse_args()
 
-    project_dir = args.project_dir
+    # --- Configuration ---
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    if not os.path.isabs(args.pdf_path):
+        print("Error: Please provide an absolute path for the PDF file.")
+        return
 
     if not os.path.exists(args.pdf_path):
         print(f"Error: The file '{args.pdf_path}' was not found.")
         return
 
-    # Load configuration
-    with open(os.path.join(project_dir, "config.yaml"), 'r') as f:
+    # Load configuration from config.yaml located in the script's directory
+    config_path = os.path.join(script_dir, "config.yaml")
+    with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
-    bibtex_path = os.path.join(project_dir, config.get("bibtex_path"))
-    json_output_dir = os.path.join(project_dir, config.get("json_output_dir"))
-    csv_output_dir = os.path.join(project_dir, config.get("csv_output_dir"))
-    md_output_dir = os.path.join(project_dir, config.get("md_output_dir"))
+    # --- Path Setup ---
+    bibtex_path = os.path.join(script_dir, config.get("bibtex_path"))
+
+    if args.output_dir:
+        # Use the user-specified output directory
+        output_dir = args.output_dir
+        json_output_dir = output_dir
+        csv_output_dir = output_dir
+        md_output_dir = output_dir
+    else:
+        # Use directories from config.yaml, relative to the script directory
+        json_output_dir = os.path.join(script_dir, config.get("json_output_dir"))
+        csv_output_dir = os.path.join(script_dir, config.get("csv_output_dir"))
+        md_output_dir = os.path.join(script_dir, config.get("md_output_dir"))
 
     # Create output directories if they don't exist
     os.makedirs(json_output_dir, exist_ok=True)
-    os.makedirs(csv_output_dir, exist_ok=True)
-    os.makedirs(md_output_dir, exist_ok=True)
+    if not args.no_csv:
+        os.makedirs(csv_output_dir, exist_ok=True)
+    if not args.no_md:
+        os.makedirs(md_output_dir, exist_ok=True)
 
-    # Define output file paths
+    # --- File Naming ---
     base_filename = os.path.splitext(os.path.basename(args.pdf_path))[0]
     json_path = os.path.join(json_output_dir, f"{base_filename}.json")
 
-    # --- Run the pipeline ---
-
-    # 1. Create enriched JSON
+    # --- Run Pipeline ---
+    # 1. Create enriched JSON (source of truth)
     create_enriched_json(args.pdf_path, bibtex_path, json_path)
 
-    # Read the created JSON to get citation_key and entry_type for naming
+    # 2. Create other exports from the JSON file
     if os.path.exists(json_path):
         with open(json_path, 'r', encoding='utf-8') as f:
             enriched_data = json.load(f)
+        
         meta = enriched_data.get("meta", {})
         citation_key = meta.get("citation_key", base_filename)
         entry_type = meta.get("entry_type", "").lower()
@@ -58,14 +80,16 @@ def main():
         if citation_key and entry_type:
             new_base_filename = f"{citation_key} {entry_type}-pdf"
         else:
-            new_base_filename = base_filename # Fallback to original if data is missing
+            new_base_filename = base_filename
 
-        csv_path = os.path.join(csv_output_dir, f"{new_base_filename}.csv")
-        md_path = os.path.join(md_output_dir, f"{new_base_filename}.md")
+        # Create exports if not disabled
+        if not args.no_csv:
+            csv_path = os.path.join(csv_output_dir, f"{new_base_filename}.csv")
+            create_readwise_csv(json_path, csv_path)
 
-        # 2. Create CSV and Markdown from the enriched JSON
-        create_readwise_csv(json_path, csv_path)
-        create_markdown_export(json_path, md_path)
+        if not args.no_md:
+            md_path = os.path.join(md_output_dir, f"{new_base_filename}.md")
+            create_markdown_export(json_path, md_path)
 
 if __name__ == "__main__":
     main()
