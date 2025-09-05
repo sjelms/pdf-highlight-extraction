@@ -3,11 +3,12 @@ Orchestrates the extraction, enrichment, and export of annotations to an enriche
 """
 import json
 import os
+import re
 import fitz
 from typing import List, Dict, Any
 
 from annotations import extract_annotations, Annotation
-from bib import load_bibtex, find_bibtex_entry, get_authors_from_entry, get_editors_from_entry
+from bib import load_bibtex, find_bibtex_entry, normalize_meta
 
 def create_enriched_json(
     pdf_path: str,
@@ -32,30 +33,21 @@ def create_enriched_json(
     # 2. Enrich with BibTeX metadata
     bib_database = load_bibtex(bib_path)
     
-    # For matching, we'll use the PDF's title and author metadata if available
-    # As a fallback, we can parse the filename
     doc = fitz.open(pdf_path)
     pdf_metadata = doc.metadata
     doc.close()
 
     pdf_title = pdf_metadata.get('title', os.path.basename(pdf_path))
-    pdf_author_list = pdf_metadata.get('author', '').split(', ')
+    
+    # Normalize author names from PDF metadata for better matching
+    pdf_author_str = pdf_metadata.get('author', '')
+    pdf_author_list = [author.strip() for author in pdf_author_str.split(',')]
 
     bib_entry = find_bibtex_entry(pdf_title, pdf_author_list, bib_database)
 
     # 3. Combine into a single structured dictionary
     if bib_entry:
-        meta = {
-            "citation_key": bib_entry.get('ID', ''),
-            "title": bib_entry.get('title', pdf_title),
-            "authors": get_authors_from_entry(bib_entry),
-            "editors": get_editors_from_entry(bib_entry),
-            "year": bib_entry.get('year', ''),
-            "doi": bib_entry.get('doi', ''),
-            "url": bib_entry.get('url', ''),
-            "entry_type": bib_entry.get('ENTRYTYPE', ''),
-            "short_title": bib_entry.get('shorttitle', ''),
-        }
+        meta = normalize_meta(bib_entry)
     else:
         # Fallback to PDF metadata if no BibTeX match
         meta = {

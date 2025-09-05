@@ -124,6 +124,8 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
     - citation_key: ID from BibTeX entry
     - authors: list of normalized authors
     - editors: list of normalized editors
+    - doi: The DOI of the entry
+    - url: The URL of the entry
 
     Args:
         entry: A BibTeX entry dictionary.
@@ -153,6 +155,8 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
 
     authors = get_authors_from_entry(entry)
     editors = get_editors_from_entry(entry)
+    doi = entry.get('doi', '')
+    url = entry.get('url', '')
 
     return {
         'title': title,
@@ -162,4 +166,6 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
         'citation_key': citation_key,
         'authors': authors,
         'editors': editors,
+        'doi': doi,
+        'url': url,
     }
