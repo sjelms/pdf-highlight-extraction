@@ -190,34 +190,29 @@ class EnrichedJson(BaseModel):
 
 ## CSV Export Details
 
-The Readwise CSV export contains exactly seven columns:
+This project uses the Readwise CSV import template with the following seven columns and order:
 
-| CSV Column | Source Field / Description                    |
-|------------|----------------------------------------------|
-| Highlight  | Annotation text                              |
-| Title      | Matched BibTeX entry title                   |
-| Author     | Concatenated author names from BibTeX       |
-| URL        | URL or DOI from BibTeX entry                  |
-| Note       | Annotation note, if any                        |
-| Location   | Page number or PDF location                    |
-| Date       | Publication year or date from BibTeX          |
+- Title: Matched BibTeX entry title (or PDF metadata/file fallback)
+- Author: Concatenated author names from BibTeX (fallbacks as needed)
+- Category: Source category, default "articles"
+- Source URL: DOI URL when available, else BibTeX `url`, else blank
+- Highlight: Annotation text
+- Note: Annotation note/comment, if any
+- Location: Page number (e.g., "Page 7")
 
 Each row corresponds to one annotation, enriched with metadata for seamless import into Readwise.
 
 ### CSV Export — Non-negotiable Field Rules (Readwise template)
 
-1. **Column order (exact):** `Highlight, Title, Author, URL, Note, Location, Date`
-2. **Highlight**: use PDF annotation text. For `Highlight` subtype, resolve via quadpoints when needed.
-3. **Title**: prefer BibTeX `title`; else PDF metadata `Title`; else cleaned filename title fragment.
-4. **Author**: prefer BibTeX authors (joined); else PDF metadata `Author`; else annotation author.
-5. **URL**: prefer canonical DOI `https://doi.org/<doi>` if present in BibTeX; else BibTeX `url`; else blank.
-6. **Note**: JSON `Text` (user comment) if present; otherwise blank. (Do **not** include color tags here.)
-7. **Location**: 1-based page number as integer (no backticks). Zero-pad only if Readwise requires (currently **no**).
-8. **Date**: annotation modification timestamp in ISO-8601 (`YYYY-MM-DD` or `YYYY-MM-DD hh:mm:ss`). If missing, use extraction timestamp.
-9. **Encoding**: CSV must be UTF-8 with header row; commas as separators; embedded quotes escaped per RFC 4180.
-10. **Deduplication**: optional; if enabled, de-dupe identical `(Highlight, Location)` pairs within a single PDF.
-11. **Citation key**: If desired, append to Author field in the format:
-    Author1, Author2, @CitationKey
+1. Column order (exact): `Title, Author, Category, Source URL, Highlight, Note, Location`
+2. Highlight: use PDF annotation text (resolve via quadpoints when needed).
+3. Title: prefer BibTeX `title`; else PDF metadata `Title`; else cleaned filename fragment.
+4. Author: prefer BibTeX authors (joined); else PDF metadata `Author`.
+5. Source URL: prefer canonical DOI `https://doi.org/<doi>`; else BibTeX `url`; else blank.
+6. Note: user comment if present; do not include color tags here.
+7. Location: 1-based page number; formatting may include the word "Page".
+8. Encoding: CSV must be UTF-8 with header row; commas as separators; embedded quotes escaped per RFC 4180.
+9. Deduplication: optional; if enabled, de-dupe identical `(Highlight, Location)` pairs.
 
 #### Edge cases & fallbacks
 - If no BibTeX match: still export, using filename/metadata fallbacks; leave URL blank.
@@ -256,9 +251,10 @@ Each row corresponds to one annotation, enriched with metadata for seamless impo
 The exported Markdown files include bibliographic metadata YAML front matter that can specify authors, editors, or both, using standardized keys such as `author`, `authors`, `editor`, or `editors`. This facilitates integration with note-taking systems that parse YAML metadata and ensures proper linkage in Obsidian and consistency with BibTeX references.
 
 **Notes:**
-- **Title and year**
-  - `title:` and `year:` fields are plain text
-  - Do **not** enclose in quotes or brackets unless the title contains special characters that break YAML parsing
+- Title and year
+  - `title:` is quoted to ensure safe parsing in Obsidian and YAML
+  - Replace any colon `:` in titles and aliases with an en dash ` – ` (space–dash–space)
+  - `year:` is plain text
 - **Citation key**
   - The `citation-key` field corresponds to the BibTeX entry key matched during processing
   - Must be preserved in the format `"[[ @Key ]]"` within YAML
@@ -266,11 +262,11 @@ The exported Markdown files include bibliographic metadata YAML front matter tha
   - Use `author-n` and `editor-n`, numbered sequentially
   - Each name is formatted as `"[[FirstName LastName]]"`
   - All Obsidian wikilinks in YAML must be enclosed in **quotes** and **double brackets**
-- **BibTeX entry type**
+- BibTeX entry type
   - Convert BibTeX entry type into a tag for YAML
-  - Remove the `@` and replace with `#`
-  - Append `-pdf` to the type
-  - Example: BibTeX type `@article` becomes `#article-pdf`
+  - Remove the `@` and replace with `#`; append `-pdf`
+  - Quote the value to avoid YAML treating it as a comment
+  - Example: BibTeX type `@article` becomes `"#article-pdf"`
 - **Highlights count**
   - The `highlights:` field must contain the integer count of highlights in the file (no quotes)
 - **Add `aliases:` field to citation YAML**
@@ -286,13 +282,13 @@ The exported Markdown files include bibliographic metadata YAML front matter tha
 **Authors only:**
 ```yaml
 ---
-title: Title
+title: "Title"
 year: 0000
 author-1: "[[First Name Last Name]]"
 author-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
-type: #article-pdf
+type: "#article-pdf"
 aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
@@ -302,13 +298,13 @@ aliases:
 **Editors only:**
 ```yaml
 ---
-title: Title
+title: "Title"
 year: 0000
 editor-1: "[[First Name Last Name]]"
 editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
-type: #book-pdf
+type: "#book-pdf"
 aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
@@ -318,7 +314,7 @@ aliases:
 **Both authors and editors:**
 ```yaml
 ---
-title: Title
+title: "Title"
 year: 0000
 author-1: "[[First Name Last Name]]"
 author-2: "[[First Name Last Name]]"
@@ -326,7 +322,7 @@ editor-1: "[[First Name Last Name]]"
 editor-2: "[[First Name Last Name]]"
 citation-key: "[[@Key]]"
 highlights: 000
-type: #incollection-pdf
+type: "#incollection-pdf"
 aliases:
       - A Better Future - Transforming Jobs And Skills For Young People Post-Pandemic
       - A Better Future
@@ -387,6 +383,31 @@ Highlight colors are mapped to tags or labels within the Markdown, allowing user
 
 ---
 
+### Output File Naming Convention
+
+- **Pattern:** `citation-key type.extension`
+  - `citation-key` → taken directly from the matched BibTeX entry (without the leading `@`)
+  - `type` → derived from the BibTeX entry type, stripped of `@` and prefixed as a YAML tag (e.g., `article-pdf`, `book-pdf`)
+  - `extension` → depends on the export format (`.md` for Markdown, `.csv` for Readwise CSV)
+
+- **Examples:**
+  - BibTeX entry: `@article{Klein2022-xj,...}`  
+    Output files:  
+    - `Klein2022-xj article-pdf.md`  
+    - `Klein2022-xj article-pdf.csv`
+  - BibTeX entry: `@book{Smith2021-ab,...}`  
+    Output files:  
+    - `Smith2021-ab book-pdf.md`  
+    - `Smith2021-ab book-pdf.csv`
+
+- **Notes:**
+  - No underscores between key and type — separated by a single space
+  - Citation key is preserved exactly as in the BibTeX file
+  - Type tag matches the `type:` field in YAML front matter for consistency
+  - Ensures unique, Obsidian-friendly filenames and easy linking
+
+---
+
 ## Testing & Validation
 
 - Unit tests cover:
@@ -418,3 +439,49 @@ Highlight colors are mapped to tags or labels within the Markdown, allowing user
 
 - **Author**: Stephen Elms  
 - **GitHub**: [https://github.com/sjelms/pdf-highlight-extraction](https://github.com/sjelms/pdf-highlight-extraction)
+
+
+## Action Items, Fixes, and Bugs
+
+### 1. Fix `export_md.py` syntax and formatting:
+- [x] Correct `.format` placeholders for authors/editors (migrated to f-strings).
+- [x] Fix bad citation key formatting.
+- [x] Quote YAML `type:` value.
+- [x] Quote aliases.
+- [x] Move color map creation outside the loop.
+- [x] Sanitize colons in Title and Aliases (replace `:` with ` – `).
+
+### 2. Fix `annotations.py` robustness and text extraction:
+- [ ] Safe iteration over `page.annots()`.
+- [ ] Remove unused `wordlist` variables.
+- [ ] Improve highlight text extraction using `quads`.
+- [ ] Defensive `color` handling.
+
+### 3. Enhance `export_json.py`:
+- [ ] Normalize authors for fuzzy matching.
+
+### 4. Enhance `export_csv.py`:
+- [ ] Prefer DOI for `Source URL`.
+
+### 5. Update `pdf-highlight-extraction.py`:
+- [ ] Consider adding CLI switches.
+
+### 6. Update `TECHNICAL.md` for consistency:
+- [x] CSV schema mismatch (documented Readwise header order used in code).
+- [x] YAML `type:` value quoting (examples and guidance updated).
+- [ ] Tests referenced in `TECHNICAL.md` do not exist.
+- [ ] `utils.py` is empty.
+
+#### Issue 1: Fix `export_md.py` syntax and formatting
+  - [x] Sub-issue 1.1: Correct `.format` placeholders for authors/editors
+    - Resolution: Replaced with f-strings writing `author-{i}: "[[Name]]"` and `editor-{i}: "[[Name]]"`.
+  - [x] Sub-issue 1.2: Fix bad citation key formatting
+    - Resolution: Now writes `citation-key: "[[@Key]]"`.
+  - [x] Sub-issue 1.3: Quote YAML `type:` value
+    - Resolution: Now writes `type: "#<entry-type>-pdf"`.
+  - [x] Sub-issue 1.4: Quote aliases
+    - Resolution: Each alias list item is quoted.
+  - [x] Sub-issue 1.5: Move color map creation outside the loop
+    - Resolution: Color map is defined once before iterating annotations.
+  - [x] Sub-issue 1.6: Sanitize colons in Title and Aliases
+    - Resolution: Colons `:` replaced with ` – ` in title and aliases to avoid Obsidian formatting issues.

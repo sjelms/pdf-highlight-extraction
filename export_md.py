@@ -2,7 +2,8 @@
 Handles the export of enriched annotations to a Markdown file.
 """
 import json
-from typing import List, Dict, Any
+import re
+
 
 def create_markdown_export(
     json_path: str,
@@ -18,48 +19,86 @@ def create_markdown_export(
     with open(json_path, 'r', encoding='utf-8') as f:
         enriched_data = json.load(f)
 
-    meta = enriched_data.get("meta", {})
-    annotations = enriched_data.get("data", [])
+    meta = enriched_data.get("meta", {}) or {}
+    annotations = enriched_data.get("data", []) or []
 
     if not annotations:
         print(f"No annotations found in {json_path}. Skipping Markdown export.")
         return
 
+    # Utility to replace any colon with an en dash surrounded by spaces
+    def _sanitize_title(text: str) -> str:
+        if not text:
+            return text
+        return re.sub(r"\s*:\s*", " – ", text)
+
     with open(output_path, 'w', encoding='utf-8') as md_file:
-        # Write YAML front matter
-        md_file.write("---
-")
-        md_file.write(f"title: \"{meta.get('title', '')}\"
-")
+    # Write YAML front matter
+        md_file.write("---\n")
+        _title = _sanitize_title(meta.get('title', ''))
+        md_file.write(f'title: "{_title}"\n')
         md_file.write(f"year: {meta.get('year', '')}\n")
-        for i, author in enumerate(meta.get('authors', [])):
-            md_file.write(f"author-{i+1}: \"{author}\"\n")
-        md_file.write(f"citation-key: \"[[@{meta.get('citation_key', '')}]]\"\n")
+
+        # Authors
+        for i, author in enumerate(meta.get('authors', []), start=1):
+            md_file.write(f'author-{i}: "[[{author}]]"\n')
+
+        # Editors
+        for i, editor in enumerate(meta.get('editors', []), start=1):
+            md_file.write(f'editor-{i}: "[[{editor}]]"\n')
+
+        # Citation key
+        citation_key = meta.get('citation_key', '')
+        if citation_key:
+            md_file.write(f'citation-key: "[[@{citation_key}]]"\n')
+
+        # Highlights count
         md_file.write(f"highlights: {len(annotations)}\n")
-        md_file.write("---
-")
+
+        # Type (quote the value to avoid YAML treating it as a comment)
+        entry_type = str(meta.get('entry_type', '') or '').lower()
+        if entry_type:
+            md_file.write(f'type: "#{entry_type}-pdf"\n')
+
+        # Aliases (quote items; they can contain special chars)
+        full_title = _sanitize_title(meta.get('title', ''))
+        short_title = _sanitize_title(meta.get('short_title', ''))
+        if full_title or short_title:
+            md_file.write("aliases:\n")
+            if full_title:
+                md_file.write(f'  - "{full_title}"\n')
+            if short_title:
+                md_file.write(f'  - "{short_title}"\n')
+
+        md_file.write("---\n\n")
+
+        # Simple color to tag mapping (can be expanded in config)
+        color_map = {
+            '#b9e8b9': '#important-pdf',
+            '#c3e1f8': '#reference-note-pdf',
+            '#f0bbcd': '#secondary-pdf',
+            '#f9e196': '#general-pdf',
+        }
 
         # Write annotations
         for annot in annotations:
-            md_file.write(f"- {annot.get('text', '')}\n")
-            md_file.write(f"> page: `{annot.get('page_number')}`\n")
-            if annot.get('color'):
-                # Simple color to tag mapping (can be expanded in config)
-                color_map = {
-                    '#b9e8b9': '#important-pdf',
-                    '#c3e1f8': '#reference-note-pdf',
-                    '#f0bbcd': '#secondary-pdf',
-                    '#f9e196': '#general-pdf'
-                }
-                tag = color_map.get(annot.get('color'), '')
-                if tag:
-                    md_file.write(f"> tags: {tag}\n")
-            
-            if annot.get('note'):
+            text = annot.get('text', '') or ''
+            page_number = annot.get('page_number')
+
+            md_file.write(f"- {text}\n")
+            md_file.write(f"> page: `{page_number}`\n")
+
+            color = annot.get('color')
+            tag = color_map.get(color, '') if color else ''
+            if tag:
+                md_file.write(f"> tags: {tag}\n")
+
+            note = annot.get('note')
+            if note:
                 md_file.write("\n")
-                md_file.write(f">[!memo]\n")
-                md_file.write(f"> {annot.get('note')}\n")
-            
+                md_file.write(">[!memo]\n")
+                md_file.write(f"> {note}\n")
+
             md_file.write("\n")
 
     print(f"Successfully exported {len(annotations)} highlights to {output_path}")

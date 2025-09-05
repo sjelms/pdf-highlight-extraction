@@ -35,6 +35,18 @@ def get_authors_from_entry(entry: Dict[str, Any]) -> List[str]:
                 authors.append(parts[0])
     return authors
 
+def get_editors_from_entry(entry: Dict[str, Any]) -> List[str]:
+    """Extracts a list of editor full names from a BibTeX entry."""
+    editors = []
+    if 'editor' in entry:
+        for editor_name in entry['editor'].split(' and '):
+            parts = [p.strip() for p in editor_name.split(',')]
+            if len(parts) == 2:
+                editors.append(f"{parts[1]} {parts[0]}")
+            else:
+                editors.append(parts[0])
+    return editors
+
 def find_bibtex_entry(
     pdf_title: str,
     pdf_authors: List[str],

@@ -32,9 +32,7 @@ def extract_annotations(pdf_path: str) -> List[Annotation]:
         for annot in page.annots():
             if annot.type[0] == 8:  # Highlight annotation
                 rect = annot.rect
-                words = [w for w in wordlist if fitz.Rect(w[:4]).intersects(rect)]
-                highlighted_text = " ".join(w[4] for w in words)
-                print(highlighted_text)
+                highlighted_text = page.get_text("text", clip=annot.rect)
 
                 # Get annotation note (comment)
                 info = annot.info

@@ -4,6 +4,7 @@ Main entry point for the PDF highlight extraction and export pipeline.
 import argparse
 import os
 import yaml
+import json
 
 from export_json import create_enriched_json
 from export_csv import create_readwise_csv
@@ -39,16 +40,30 @@ def main():
     # Define output file paths
     base_filename = os.path.splitext(os.path.basename(args.pdf_path))[0]
     json_path = os.path.join(json_output_dir, f"{base_filename}.json")
-    csv_path = os.path.join(csv_output_dir, f"{base_filename}.csv")
-    md_path = os.path.join(md_output_dir, f"{base_filename}.md")
 
     # --- Run the pipeline ---
 
     # 1. Create enriched JSON
     create_enriched_json(args.pdf_path, bibtex_path, json_path)
 
-    # 2. Create CSV and Markdown from the enriched JSON
+    # Read the created JSON to get citation_key and entry_type for naming
     if os.path.exists(json_path):
+        with open(json_path, 'r', encoding='utf-8') as f:
+            enriched_data = json.load(f)
+        meta = enriched_data.get("meta", {})
+        citation_key = meta.get("citation_key", base_filename)
+        entry_type = meta.get("entry_type", "").lower()
+
+        # Construct new base_filename based on naming convention
+        if citation_key and entry_type:
+            new_base_filename = f"{citation_key} {entry_type}-pdf"
+        else:
+            new_base_filename = base_filename # Fallback to original if data is missing
+
+        csv_path = os.path.join(csv_output_dir, f"{new_base_filename}.csv")
+        md_path = os.path.join(md_output_dir, f"{new_base_filename}.md")
+
+        # 2. Create CSV and Markdown from the enriched JSON
         create_readwise_csv(json_path, csv_path)
         create_markdown_export(json_path, md_path)
 

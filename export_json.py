@@ -7,7 +7,7 @@ import fitz
 from typing import List, Dict, Any
 
 from annotations import extract_annotations, Annotation
-from bib import load_bibtex, find_bibtex_entry, get_authors_from_entry
+from bib import load_bibtex, find_bibtex_entry, get_authors_from_entry, get_editors_from_entry
 
 def create_enriched_json(
     pdf_path: str,
@@ -49,9 +49,12 @@ def create_enriched_json(
             "citation_key": bib_entry.get('ID', ''),
             "title": bib_entry.get('title', pdf_title),
             "authors": get_authors_from_entry(bib_entry),
+            "editors": get_editors_from_entry(bib_entry),
             "year": bib_entry.get('year', ''),
             "doi": bib_entry.get('doi', ''),
             "url": bib_entry.get('url', ''),
+            "entry_type": bib_entry.get('ENTRYTYPE', ''),
+            "short_title": bib_entry.get('shorttitle', ''),
         }
     else:
         # Fallback to PDF metadata if no BibTeX match
@@ -59,9 +62,12 @@ def create_enriched_json(
             "citation_key": "",
             "title": pdf_title,
             "authors": pdf_author_list,
+            "editors": [],
             "year": "",
             "doi": "",
             "url": "",
+            "entry_type": "",
+            "short_title": "",
         }
 
     enriched_data = {
