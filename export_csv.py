@@ -34,11 +34,18 @@ def create_readwise_csv(
         writer.writeheader()
 
         for annot in annotations:
+            # Prioritize DOI for Source URL, then fallback to URL
+            source_url = ""
+            if meta.get("doi"):
+                source_url = f'https://doi.org/{meta.get("doi")}'
+            elif meta.get("url"):
+                source_url = meta.get("url")
+
             writer.writerow({
                 "Title": meta.get("title", ""),
                 "Author": ", ".join(meta.get("authors", [])),
                 "Category": "articles",  # Defaulting to articles
-                "Source URL": meta.get("url", ""),
+                "Source URL": source_url,
                 "Highlight": annot.get("text", ""),
                 "Note": annot.get("note", ""),
                 "Location": f'Page {annot.get("page_number")}',

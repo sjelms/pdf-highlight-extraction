@@ -90,7 +90,8 @@ def create_markdown_export(
             if note:
                 md_file.write("\n")
                 md_file.write(">[!memo]\n")
-                md_file.write(f"> {note}\n")
+                for line in note.strip().split('\n'):
+                    md_file.write(f"> {line}\n")
 
             md_file.write("\n")
 

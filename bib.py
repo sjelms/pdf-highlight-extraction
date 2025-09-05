@@ -32,39 +32,54 @@ def _normalize_initials(name: str) -> str:
     # Replace any single uppercase letter followed by a period with just the letter
     return re.sub(r'\b([A-Z])\.\b', r'\1', name)
 
+
+def _strip_braces(text: str) -> str:
+    """Remove surrounding braces often present in BibTeX fields."""
+    return text.replace('{', '').replace('}', '')
+
+
+def _parse_names(field_value: str) -> List[str]:
+    """Parse a BibTeX author/editor field into normalized full names.
+
+    - Robustly split on 'and' with any whitespace around it (including newlines).
+    - Support "Last, First" -> "First Last" conversion.
+    - Keep multi-part last names (e.g., "LaScola Needy").
+    - Normalize initials by removing trailing periods in single-letter initials.
+    """
+    if not field_value:
+        return []
+
+    raw = _strip_braces(field_value.strip())
+    parts = re.split(r"\s+and\s+", raw)
+    people: List[str] = []
+
+    for p in parts:
+        name = p.strip()
+        if not name:
+            continue
+        # Split on first comma only to preserve commas within names
+        last_first = [s.strip() for s in name.split(',', 1)]
+        if len(last_first) == 2:
+            last, first = last_first[0], last_first[1]
+            full_name = f"{first} {last}".strip()
+        else:
+            # Already in First Last order or single token
+            full_name = last_first[0]
+
+        # Collapse internal whitespace and normalize initials
+        full_name = re.sub(r"\s+", " ", full_name)
+        full_name = _normalize_initials(full_name)
+        people.append(full_name)
+
+    return people
+
 def get_authors_from_entry(entry: Dict[str, Any]) -> List[str]:
     """Extracts a list of author full names from a BibTeX entry, normalized."""
-    authors = []
-    if 'author' in entry:
-        for author_name in entry['author'].split(' and '):
-            parts = [p.strip() for p in author_name.split(',')]
-            if len(parts) == 2:
-                # "Last, First" --> "First Last"
-                full_name = f"{parts[1]} {parts[0]}"
-            else:
-                # Already "First Last" or similar
-                full_name = parts[0]
-            # Normalize initials by removing periods
-            full_name = _normalize_initials(full_name)
-            authors.append(full_name)
-    return authors
+    return _parse_names(entry.get('author', ''))
 
 def get_editors_from_entry(entry: Dict[str, Any]) -> List[str]:
     """Extracts a list of editor full names from a BibTeX entry, normalized."""
-    editors = []
-    if 'editor' in entry:
-        for editor_name in entry['editor'].split(' and '):
-            parts = [p.strip() for p in editor_name.split(',')]
-            if len(parts) == 2:
-                # "Last, First" --> "First Last"
-                full_name = f"{parts[1]} {parts[0]}"
-            else:
-                # Already "First Last" or similar
-                full_name = parts[0]
-            # Normalize initials by removing periods
-            full_name = _normalize_initials(full_name)
-            editors.append(full_name)
-    return editors
+    return _parse_names(entry.get('editor', ''))
 
 def find_bibtex_entry(
     pdf_title: str,
@@ -124,6 +139,8 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
     - citation_key: ID from BibTeX entry
     - authors: list of normalized authors
     - editors: list of normalized editors
+    - doi: The DOI of the entry
+    - url: The URL of the entry
 
     Args:
         entry: A BibTeX entry dictionary.
@@ -153,6 +170,8 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
 
     authors = get_authors_from_entry(entry)
     editors = get_editors_from_entry(entry)
+    doi = entry.get('doi', '')
+    url = entry.get('url', '')
 
     return {
         'title': title,
@@ -162,4 +181,6 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
         'citation_key': citation_key,
         'authors': authors,
         'editors': editors,
+        'doi': doi,
+        'url': url,
     }

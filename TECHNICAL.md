@@ -23,16 +23,7 @@ The tool parses PDF highlights, enriches them with bibliographic metadata via Bi
 ├── export_json.py                     # Generate JSON exports the "raw" data of the annotations
 ├── export_csv.py                      # Generate Readwise-ready CSV exports
 ├── export_md.py                       # Generate Markdown exports of annotations
-├── utils.py                           # Utility functions (logging, parsing helpers)
 ├── config.yaml                        # Configuration file for paths and options
-├── tests/                             # Unit and integration tests
-│   ├── test_annotations.py
-│   ├── test_bib.py
-│   ├── test_export.py
-│   └── fixtures/
-│       ├── sample.pdf
-│       ├── sample.bib
-│       └── expected.csv
 ├── TECHNICAL.md
 └── README.md
 ```
@@ -77,15 +68,18 @@ pip install -r requirements.txt
 The pipeline proceeds as follows:
 
 1.  **PDF Annotation Extraction**  
-    Parse each PDF to extract a list of raw highlight annotations.
+    Parse each PDF to extract a list of raw highlight annotations. The extracted text is cleaned to remove unwanted line breaks.
 
 2.  **Metadata Enrichment via BibTeX**  
-    Parse the BibTeX file and match the PDF to a BibTeX entry to retrieve enriched metadata (e.g., citation key, full author names, publication year).
+    Parse the BibTeX file and match the PDF to a BibTeX entry to retrieve enriched metadata.
 
-3.  **Enriched JSON Export**  
-    Combine the raw annotations and the enriched metadata into a single, structured JSON file. This file will contain a `meta` section for the document-level data and a `data` section for the list of individual highlights.
+3.  **Metadata Normalization**
+    The matched BibTeX entry is processed by the `normalize_meta` function to clean and standardize the metadata (e.g., title, authors, year).
 
-4.  **Final Export Generation**  
+4.  **Enriched JSON Export**  
+    Combine the raw annotations and the normalized metadata into a single, structured JSON file. This file will contain a `meta` section for the document-level data and a `data` section for the list of individual highlights.
+
+5.  **Final Export Generation**  
     Use the enriched JSON file as the single source of truth to generate the final output files:
     *   A **Readwise-ready CSV file**.
     *   A **Markdown file** with YAML front matter and formatted annotations.
@@ -95,37 +89,25 @@ The pipeline proceeds as follows:
 ## Core Functions
 
 ### `extract_annotations(pdf_path: str) -> List[Annotation]`  
-Extracts highlight annotations from a PDF file, returning a list of `Annotation` objects containing text, page number, color, and notes.
+Extracts highlight annotations from a PDF file, returning a list of `Annotation` objects. The extracted text is cleaned to remove single line breaks, creating flowing paragraphs.
 
-### `resolve_highlight_text(page: PdfPage, annot: PdfAnnotation) -> str`  
-Given a PDF page and an annotation object, extracts and cleans the highlighted text content.
-
-### `parse_filename_metadata(filename: str) -> ParsedName`  
-Parses a PDF filename to extract metadata such as author(s), year, and title components for matching.
-
-### `load_bibtex(bibtex_path: str) -> BibDB`  
+### `load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase`  
 Loads and parses a BibTeX file into an internal database structure for efficient lookup.
 
-### `find_bibtex_entry_by_title_and_authors(title: str, authors: List[str], bibtex_path: str) -> dict | None`  
-Searches the BibTeX database for an entry matching the given title and author list; returns the matching entry or None.
+### `find_bibtex_entry(pdf_title: str, pdf_authors: List[str], bib_database: bibtexparser.bibdatabase.BibDatabase, title_threshold: int = 80, author_threshold: int = 80) -> Optional[Dict[str, Any]]`  
+Finds the best matching BibTeX entry for a given PDF based on title and author similarity.
 
-### `parse_bibtex_entry(citation_key: str, bibtex_path: str) -> Optional[Dict[str, Any]]`  
-Extracts detailed metadata fields from a BibTeX entry identified by its citation key.
+### `normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]`
+Centralizes the cleaning and normalization of metadata from a BibTeX entry. This includes standardizing titles, authors, editors, and other fields to ensure consistency across all export formats.
 
-### `bibtex_to_yaml_names(bibtex_authors: str) -> List[str]`  
-Converts BibTeX author strings into a list of standardized author names suitable for YAML or other structured formats.
+### `create_enriched_json(pdf_path: str, bib_path: str, output_path: str)`
+Orchestrates the extraction, enrichment, and export of annotations to an enriched JSON file.
 
-### `match_pdf_to_bib(pdf_meta: ParsedName, parsed_name: ParsedName, bibdb: BibDB) -> MatchResult`  
-Performs heuristic matching between extracted PDF metadata and BibTeX entries, returning a `MatchResult` with matching status and matched entry.
+### `create_readwise_csv(json_path: str, output_path: str)`
+Creates a Readwise-ready CSV file from an enriched JSON file.
 
-### `build_readwise_rows(annotations: List[Annotation], match: MatchResult) -> List[Dict[str, str]]`  
-Constructs a list of dictionaries representing rows for the Readwise CSV export, mapping annotation and metadata fields.
-
-### `write_readwise_csv(rows: List[Dict[str, str]], out_path: str)`  
-Writes the Readwise CSV rows to the specified output file with appropriate headers.
-
-### `write_markdown(annotations: List[Annotation], match: MatchResult, out_path: str)`  
-Generates a Markdown file summarizing annotations with enriched metadata and writes it to the specified path.
+### `create_markdown_export(json_path: str, output_path: str)`
+Creates a Markdown file from an enriched JSON file.
 
 ---
 
@@ -167,7 +149,7 @@ from pydantic import BaseModel
 
 class Annotation(BaseModel):
     text: str
-    page: int
+    page_number: int
     color: Optional[str] = None
     note: Optional[str] = None
 
@@ -337,13 +319,9 @@ aliases:
 - Annotations with user notes are displayed beneath the highlight text, indented or styled for clarity.
 - Each highlight begins with a list item marker `- ` followed by the highlighted text.
 - Immediately following the highlight text is a blockquote `>` containing metadata:
-  - `page: \`00\`` indicating the page number where the highlight appears.
+  - `page: `00``` indicating the page number where the highlight appears.
   - `tags: #color-tag` where the color tag corresponds to the highlight's color.
-- If the annotation includes a user comment (the `Text` field in the JSON annotation), add a blank line after the metadata block and then:
-  ```
-  >[!memo]
-  > Comment text
-  ```
+- If the annotation includes a user comment, a blank line is added after the metadata block, followed by a `>[!memo]` callout. Multi-line comments are correctly formatted, with each line prefixed by `>`. 
 
 ### Color-to-Tag Mapping
 
@@ -410,28 +388,62 @@ Highlight colors are mapped to tags or labels within the Markdown, allowing user
 
 ## Testing & Validation
 
-- Unit tests cover:
-  - Annotation extraction correctness
-  - BibTeX parsing and matching logic
-  - CSV and Markdown export formatting
-- Integration tests use fixtures with sample PDFs and BibTeX files.
-- Golden files (`expected.csv`, `expected.md`) used to verify output consistency.
-- Edge cases tested:
-  - PDFs with no highlights
-  - BibTeX entries with missing fields
-  - Filename irregularities
-  - Multiple authors and ambiguous matches
+Testing is planned as a future enhancement. When implemented, it will include:
+- Unit tests for annotation extraction, BibTeX parsing, and export formatting.
+- Integration tests using sample PDFs and BibTeX files.
+- Verification of output consistency using golden files.
 
 ---
 
 ## Future Enhancements
 
 - Consolidate multiple PDFs into a single CSV export.
+
+---
+
+## Changelog
+
+- 2025-09-05
+  - Highlight extraction: switched to quad-based clipping for highlight text (use annotation vertices/quads, sort rects top-to-bottom then left-to-right, fallback to annotation rect). Cleans single newlines to spaces; preserves paragraph breaks. Result: populated `data[].text` in JSON and non-empty Markdown bullets.
+  - Color capture: prefer stroke color with fallback to fill; convert RGB floats to hex (e.g., `#f0bbcd`).
+  - Author/editor parsing: robust BibTeX name handling. Split on `and` across lines, support "Last, First" → "First Last", preserve multi-part last names (e.g., "LaScola Needy"), strip braces, and normalize initials (e.g., `H.` → `H`). Produces full names such as "Makarand Hastak" and "Kim LaScola Needy".
+  - PDF metadata authors: more robust fallback split on commas, semicolons, or the word `and` to improve matching when BibTeX is unavailable.
+  - Impact: export formats unchanged; CSV/Markdown now include correct author lists and actual highlight text.
+
+Files affected: `annotations.py`, `bib.py`, `export_json.py`.
 - Incorporate DOI lookup APIs for enhanced metadata fetching.
 - Implement color mapping for highlight types.
 - Add deduplication logic for repeated highlights.
 - Support additional export formats (e.g., JSON, HTML).
 - Improve fuzzy matching with machine learning techniques.
+
+---
+
+## Command-Line Interface (CLI)
+
+The script can be run from the command line with the following arguments:
+
+- `pdf_path`: (Required) The absolute path to the PDF file to process.
+- `--output-dir`: (Optional) Specify a directory to save all output files. This overrides the paths set in `config.yaml`.
+- `--no-csv`: (Optional) A flag to disable the CSV export.
+- `--no-md`: (Optional) A flag to disable the Markdown export.
+
+### Examples:
+
+**Process a PDF and save to the default output directories:**
+```bash
+python pdf-highlight-extraction.py /path/to/your/file.pdf
+```
+
+**Process a PDF and save all outputs to a specific directory:**
+```bash
+python pdf-highlight-extraction.py /path/to/your/file.pdf --output-dir /path/to/your/output
+```
+
+**Process a PDF and only generate the Markdown file:**
+```bash
+python pdf-highlight-extraction.py /path/to/your/file.pdf --no-csv
+```
 
 ---
 
@@ -450,38 +462,20 @@ Highlight colors are mapped to tags or labels within the Markdown, allowing user
 - [x] Quote aliases.
 - [x] Move color map creation outside the loop.
 - [x] Sanitize colons in Title and Aliases (replace `:` with ` – `).
+- [x] Fix multi-line memo formatting.
 
 ### 2. Fix `annotations.py` robustness and text extraction:
-- [ ] Safe iteration over `page.annots()`.
-- [ ] Remove unused `wordlist` variables.
-- [ ] Improve highlight text extraction using `quads`.
-- [ ] Defensive `color` handling.
+- [x] Safe iteration over `page.annots()`.
+- [x] Remove unused `wordlist` variables.
+- [x] Improve highlight text extraction by using `annot.get_text("text")`.
+- [x] Defensive `color` handling.
+- [x] Clean up highlight text to remove single newlines.
 
 ### 3. Enhance `export_json.py`:
-- [ ] Normalize authors for fuzzy matching.
+- [x] Normalize authors for fuzzy matching by using `normalize_meta`.
 
 ### 4. Enhance `export_csv.py`:
-- [ ] Prefer DOI for `Source URL`.
+- [x] Prefer DOI for `Source URL`.
 
 ### 5. Update `pdf-highlight-extraction.py`:
-- [ ] Consider adding CLI switches.
-
-### 6. Update `TECHNICAL.md` for consistency:
-- [x] CSV schema mismatch (documented Readwise header order used in code).
-- [x] YAML `type:` value quoting (examples and guidance updated).
-- [ ] Tests referenced in `TECHNICAL.md` do not exist.
-- [ ] `utils.py` is empty.
-
-#### Issue 1: Fix `export_md.py` syntax and formatting
-  - [x] Sub-issue 1.1: Correct `.format` placeholders for authors/editors
-    - Resolution: Replaced with f-strings writing `author-{i}: "[[Name]]"` and `editor-{i}: "[[Name]]"`.
-  - [x] Sub-issue 1.2: Fix bad citation key formatting
-    - Resolution: Now writes `citation-key: "[[@Key]]"`.
-  - [x] Sub-issue 1.3: Quote YAML `type:` value
-    - Resolution: Now writes `type: "#<entry-type>-pdf"`.
-  - [x] Sub-issue 1.4: Quote aliases
-    - Resolution: Each alias list item is quoted.
-  - [x] Sub-issue 1.5: Move color map creation outside the loop
-    - Resolution: Color map is defined once before iterating annotations.
-  - [x] Sub-issue 1.6: Sanitize colons in Title and Aliases
-    - Resolution: Colons `:` replaced with ` – ` in title and aliases to avoid Obsidian formatting issues.
+- [x] Add CLI switches for flexible execution.
