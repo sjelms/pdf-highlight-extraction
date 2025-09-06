@@ -10,4 +10,5 @@ json_output_dir: "output/json"
 csv_output_dir: "output/csv"
 
 # Directory to save the Markdown files
-md_output_dir: "output/md"
+# Path to Obsidian vault highlights directory (absolute path)
+md_output_dir: "/Users/stephenelms/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian Vault/Literature Highlights"

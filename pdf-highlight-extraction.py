@@ -5,14 +5,17 @@ import argparse
 import os
 import yaml
 import json
+import time
 
 from export_json import create_enriched_json
 from export_csv import create_readwise_csv
 from export_md import create_markdown_export
+from ui_notifications import show_final_dialog
 
 def main():
     """Main function to run the pipeline."""
-    
+    start_time = time.time()
+
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="Extract PDF highlights and export to various formats.")
     parser.add_argument("pdf_path", help="The absolute path to the PDF file to process.")
@@ -65,31 +68,89 @@ def main():
 
     # --- Run Pipeline ---
     # 1. Create enriched JSON (source of truth)
+    json_status = None
+    csv_status = None
+    md_status = None
+    highlight_count = 0
+    output_display_name = base_filename
+
     create_enriched_json(args.pdf_path, bibtex_path, json_path)
 
     # 2. Create other exports from the JSON file
     if os.path.exists(json_path):
-        with open(json_path, 'r', encoding='utf-8') as f:
-            enriched_data = json.load(f)
-        
-        meta = enriched_data.get("meta", {})
-        citation_key = meta.get("citation_key", base_filename)
-        entry_type = meta.get("entry_type", "").lower()
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                enriched_data = json.load(f)
+        except Exception:
+            enriched_data = None
 
-        # Construct new base_filename based on naming convention
-        if citation_key and entry_type:
-            new_base_filename = f"{citation_key} {entry_type}-pdf"
+        if enriched_data:
+            annotations = enriched_data.get("data", [])
+            highlight_count = len(annotations)
+            meta = enriched_data.get("meta", {})
+            citation_key = meta.get("citation_key", base_filename)
+            entry_type = meta.get("entry_type", "").lower()
+
+            # Construct new base_filename based on naming convention
+            if citation_key and entry_type:
+                output_display_name = f"{citation_key} {entry_type}-pdf"
+            else:
+                output_display_name = base_filename
+
+            # JSON status
+            json_status = "success"
+
+            # Create exports if not disabled
+            if not args.no_csv:
+                csv_path = os.path.join(csv_output_dir, f"{output_display_name}.csv")
+                try:
+                    if highlight_count > 0:
+                        create_readwise_csv(json_path, csv_path)
+                        csv_status = "success" if os.path.exists(csv_path) else "failed"
+                    else:
+                        # export_csv.py skips when no annotations
+                        csv_status = "warning"
+                except Exception:
+                    csv_status = "failed"
+
+            if not args.no_md:
+                md_path = os.path.join(md_output_dir, f"{output_display_name}.md")
+                try:
+                    if highlight_count > 0:
+                        create_markdown_export(json_path, md_path)
+                        md_status = "success" if os.path.exists(md_path) else "failed"
+                    else:
+                        # export_md.py skips when no annotations
+                        md_status = "warning"
+                except Exception:
+                    md_status = "failed"
         else:
-            new_base_filename = base_filename
+            json_status = "failed"
+    else:
+        json_status = "failed"
 
-        # Create exports if not disabled
-        if not args.no_csv:
-            csv_path = os.path.join(csv_output_dir, f"{new_base_filename}.csv")
-            create_readwise_csv(json_path, csv_path)
+    # 3. Show macOS dialog summary (best-effort)
+    elapsed = time.time() - start_time
+    # Classify outcome for single-file run
+    success_count = 1 if json_status == "success" and (csv_status in (None, "success", "warning")) and (md_status in (None, "success", "warning")) else 0
+    fail_count = 1 if json_status == "failed" or csv_status == "failed" or md_status == "failed" else 0
+    issue_count = 1 if not fail_count and (csv_status == "warning" or md_status == "warning" or highlight_count == 0) else 0
 
-        if not args.no_md:
-            md_path = os.path.join(md_output_dir, f"{new_base_filename}.md")
-            create_markdown_export(json_path, md_path)
+    try:
+        show_final_dialog(
+            file_name=output_display_name,
+            highlight_count=highlight_count,
+            json_status=json_status,
+            csv_status=csv_status,
+            md_status=md_status,
+            success_count=success_count,
+            issue_count=issue_count,
+            fail_count=fail_count,
+            elapsed_sec=elapsed,
+        )
+    except Exception:
+        # Never fail the run due to dialog issues
+        pass
 
 if __name__ == "__main__":
     main()

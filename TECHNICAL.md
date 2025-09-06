@@ -342,7 +342,7 @@ Highlight colors are mapped to tags or labels within the Markdown, allowing user
 
 ### Exact Example
 
-```
+```markdown
 - This is a highlight
 > page: `00`
 > tags: #general-pdf

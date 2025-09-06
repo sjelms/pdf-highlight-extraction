@@ -23,6 +23,11 @@ The pipeline’s single source of truth is an enriched JSON file per PDF that co
 
 - Python 3.9+
 - Packages in `requirements.txt`
+    - PyMuPDF
+    - pydantic
+    - bibtexparser
+    - thefuzz[speedup]
+    - PyYAML
 
 ## Setup
 
