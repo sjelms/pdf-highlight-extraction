@@ -2,6 +2,7 @@
 Handles the export of enriched annotations to a Markdown file.
 """
 import json
+import re
 
 
 def create_markdown_export(
@@ -53,17 +54,44 @@ def create_markdown_export(
         if entry_type:
             md_file.write(f'type: "#{entry_type}-pdf"\n')
 
-        # Aliases (quote items; they can contain special chars)
-        full_title = meta.get('title', '')
-        short_title = meta.get('short_title', '')
-        if full_title or short_title:
+        # Aliases (full title + optional short title). Avoid duplicates.
+        full_title = meta.get('title', '') or ''
+        short_title = meta.get('short_title', '') or ''
+
+        aliases: list[str] = []
+        if full_title:
+            aliases.append(full_title)
+
+        # Derive a short title if not provided: take text before a dash/colon
+        if not short_title and full_title:
+            parts = re.split(r"\s*[–—-:]\s*", full_title, maxsplit=1)
+            if len(parts) > 1 and parts[0].strip():
+                short_title = parts[0].strip()
+
+        if short_title:
+            aliases.append(short_title)
+
+        # Deduplicate while preserving order
+        seen = set()
+        unique_aliases = []
+        for a in aliases:
+            key = a.strip()
+            if key and key not in seen:
+                seen.add(key)
+                unique_aliases.append(a)
+
+        if unique_aliases:
             md_file.write("aliases:\n")
-            if full_title:
-                md_file.write(f'  - "{full_title}"\n')
-            if short_title:
-                md_file.write(f'  - "{short_title}"\n')
+            for a in unique_aliases:
+                md_file.write(f'  - "{a}"\n')
 
         md_file.write("---\n\n")
+
+        # Add H1 header with citation key after YAML front matter
+        if citation_key:
+            md_file.write(f"# Highlights for [[@{citation_key}]]\n\n")
+        else:
+            md_file.write("# Highlights\n\n")
 
         # Simple color to tag mapping (can be expanded in config)
         color_map = {
@@ -72,6 +100,27 @@ def create_markdown_export(
             '#f0bbcd': '#secondary-pdf',
             '#f9e196': '#general-pdf',
         }
+
+        # Helper: check whether an annotation note is meaningful (not just a copy of the text)
+        def _normalize_for_compare(s: str) -> str:
+            # Compare notes to text verbatim aside from whitespace differences
+            s = (s or "")
+            s = s.replace("\r\n", "\n").replace("\r", "\n")
+            s = s.replace("\n", " ")
+            s = re.sub(r"\s+", " ", s)
+            return s.strip()
+
+        def _is_meaningful_note(note: str, text: str) -> bool:
+            if not note or not note.strip():
+                return False
+            nn = _normalize_for_compare(note)
+            nt = _normalize_for_compare(text)
+            if not nn:
+                return False
+            # Skip only if verbatim (modulo whitespace) duplicate of the text
+            if nn == nt:
+                return False
+            return True
 
         # Write annotations
         for annot in annotations:
@@ -87,10 +136,11 @@ def create_markdown_export(
                 md_file.write(f"> tags: {tag}\n")
 
             note = annot.get('note')
-            if note:
+            if _is_meaningful_note(note, text):
                 md_file.write("\n")
                 md_file.write(">[!memo]\n")
-                for line in note.strip().split('\n'):
+                _note_text = note.replace("\r\n", "\n").replace("\r", "\n").strip()
+                for line in _note_text.split('\n'):
                     md_file.write(f"> {line}\n")
 
             md_file.write("\n")

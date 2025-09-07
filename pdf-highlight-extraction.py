@@ -97,8 +97,9 @@ def main():
             else:
                 output_display_name = base_filename
 
-            # JSON status
-            json_status = "success"
+            # JSON status: warn if BibTeX metadata wasn't found/complete
+            meta_complete = bool(meta.get("citation_key")) and bool(meta.get("title")) and bool(meta.get("year"))
+            json_status = "success" if meta_complete else "warning"
 
             # Create exports if not disabled
             if not args.no_csv:
@@ -134,7 +135,9 @@ def main():
     # Classify outcome for single-file run
     success_count = 1 if json_status == "success" and (csv_status in (None, "success", "warning")) and (md_status in (None, "success", "warning")) else 0
     fail_count = 1 if json_status == "failed" or csv_status == "failed" or md_status == "failed" else 0
-    issue_count = 1 if not fail_count and (csv_status == "warning" or md_status == "warning" or highlight_count == 0) else 0
+    issue_count = 1 if not fail_count and (
+        json_status == "warning" or csv_status == "warning" or md_status == "warning" or highlight_count == 0
+    ) else 0
 
     try:
         show_final_dialog(

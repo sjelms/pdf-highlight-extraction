@@ -127,6 +127,56 @@ def find_bibtex_entry(
     return best_match
 
 
+def _sanitize_basename(name: str) -> str:
+    """Normalize a filename-like string for fuzzy matching.
+
+    - Lowercase
+    - Replace separators (underscore, hyphen, dot) with spaces
+    - Remove file-extension-like suffixes
+    - Collapse whitespace
+    """
+    import re as _re
+    n = name.strip().lower()
+    # strip a trailing extension if present
+    n = _re.sub(r"\.[a-z0-9]{1,5}$", "", n)
+    n = n.replace("_", " ").replace("-", " ").replace(".", " ")
+    n = _re.sub(r"\s+", " ", n)
+    return n
+
+
+def find_bibtex_entry_by_basename(
+    base_filename: str,
+    bib_database: bibtexparser.bibdatabase.BibDatabase,
+    id_threshold: int = 75,
+    title_threshold: int = 80,
+) -> Optional[Dict[str, Any]]:
+    """Find a BibTeX entry by comparing the file's base name to entry ID and title.
+
+    Useful when embedded PDF metadata is sparse or blank but the file name
+    contains author/year or the BibTeX key.
+    """
+    target = _sanitize_basename(base_filename)
+    if not target:
+        return None
+
+    best: Optional[Dict[str, Any]] = None
+    best_score = 0
+    for entry in bib_database.entries:
+        entry_id = str(entry.get("ID", "")).strip()
+        entry_title = str(entry.get("title", "")).strip()
+
+        id_score = fuzz.token_set_ratio(target, entry_id)
+        title_score = fuzz.token_set_ratio(target, entry_title)
+
+        # Prefer ID matches slightly over title for filenames
+        combined = max(int(id_score * 1.05), title_score)
+
+        if (id_score >= id_threshold or title_score >= title_threshold) and combined > best_score:
+            best = entry
+            best_score = combined
+
+    return best
+
 def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extracts and normalizes metadata from a BibTeX entry.
@@ -149,8 +199,9 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
         A dictionary with normalized metadata.
     """
     raw_title = entry.get('title', '').strip()
-    # Replace colons with en dashes
+    # Normalize separators to an en dash surrounded by spaces
     title = raw_title.replace(':', ' – ')
+    title = re.sub(r"\s+[-–—]\s+", " – ", title)
     # Collapse multiple whitespace into single space
     title = re.sub(r'\s+', ' ', title)
     # Strip trailing punctuation (e.g., periods, commas, colons, semicolons)
