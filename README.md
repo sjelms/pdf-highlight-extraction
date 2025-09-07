@@ -13,11 +13,12 @@ The pipeline’s single source of truth is an enriched JSON file per PDF that co
 ## Features
 
 - Quad-based highlight extraction using PyMuPDF (reliable text capture from highlighted quadpoints)
-- BibTeX integration with fuzzy title/author matching and normalization
+- BibTeX integration with filename-first matching, fuzzy fallbacks, and normalization
 - Robust author/editor parsing (supports “Last, First” format, multiline `and` separators, initials, and multi-part surnames like “LaScola Needy”)
-- Markdown export with Obsidian-friendly YAML front matter, aliases, and color tags
+- Markdown export with Obsidian-friendly YAML front matter, H1 header, aliases, and color tags
 - Readwise CSV export following the official template
 - Deterministic output naming using citation key and type (e.g., `Assaad2022-zl article-pdf.md`)
+- JSON sanitization for clean text/notes (normalized whitespace, single-line fields, readable Unicode)
 
 ## Requirements
 
@@ -56,16 +57,20 @@ python pdf-highlight-extraction.py \
 - Provide an absolute path to the PDF.
 - If `--output-dir` is omitted, outputs go to folders specified in `config.yaml`.
 - Filenames use: `"<citation-key> <entry-type>-pdf.<ext>"`; when no BibTeX match, fall back to the PDF base name.
+  - Matching prefers the PDF filename schema `Title_Authors_Year` against BibTeX IDs/titles; falls back to embedded PDF metadata.
 
 ## Output Details
 
 ### Enriched JSON
 - `meta` includes: `title`, `short_title`, `year`, `entry_type`, `citation_key`, `authors`, `editors`, `doi`, `url`.
 - `data` is a list of annotations: `text`, `page_number`, `color`, `note`.
+  - Text and notes are sanitized: HTML entities unescaped, CR/LF normalized, zero‑width/soft hyphen removed, intra-line whitespace collapsed, and newlines joined into single spaces.
 
 ### Markdown
-- YAML front matter: title, year, `author-n` / `editor-n`, `citation-key`, `highlights`, `type`, and `aliases` (full and short title).
+- YAML front matter: title, year, `author-n` / `editor-n`, `citation-key`, `highlights`, `type`, and `aliases` (full and optionally short title).
+- Adds `# Highlights for [[@{citation_key}]]` after YAML (falls back to `# Highlights` if no key).
 - Each highlight renders as a bullet with page and optional color tag.
+- Memos: a memo block is included only when the note is present and not a verbatim duplicate of the highlight text (whitespace-insensitive).
 - Color→tag mapping (default):
   - `#b9e8b9` → `#important-pdf`
   - `#c3e1f8` → `#reference-note-pdf`
@@ -89,6 +94,16 @@ Columns (in order): `Title, Author, Category, Source URL, Highlight, Note, Locat
 - If highlight text is empty, ensure annotations are highlight-type and the PDF isn’t scanned; quad-based extraction is used by default.
 - Author parsing relies on BibTeX `author` / `editor` fields. For mismatches, confirm the BibTeX entry and citation key.
 - Outputs require the PDF path to be absolute when invoking the script.
+- The run summary dialog reports "warning" when metadata is incomplete (e.g., BibTeX key not found) so you can review issues even if exports succeed.
+
+## What’s New
+
+- Prefer filename-based BibTeX matching; fallback to PDF metadata fuzzy match
+- Add H1 header in Markdown: `# Highlights for [[@{citation_key}]]`
+- Improve `aliases`: include full title and optional short title (derived before dash/colon); de-duplicate
+- Sanitize JSON text/notes and write Unicode without `\uXXXX`
+- Suppress memos that are exact duplicates of the highlight text
+- Surface incomplete metadata as "warning" in the summary dialog
 
 ## Related Docs
 

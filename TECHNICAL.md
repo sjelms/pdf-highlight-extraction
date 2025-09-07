@@ -68,16 +68,16 @@ pip install -r requirements.txt
 The pipeline proceeds as follows:
 
 1.  **PDF Annotation Extraction**  
-    Parse each PDF to extract a list of raw highlight annotations. The extracted text is cleaned to remove unwanted line breaks.
+    Parse each PDF to extract a list of raw highlight annotations.
 
 2.  **Metadata Enrichment via BibTeX**  
-    Parse the BibTeX file and match the PDF to a BibTeX entry to retrieve enriched metadata.
+    Parse the BibTeX file and match the PDF to a BibTeX entry to retrieve enriched metadata. Matching prefers the PDF filename schema `Title_Authors_Year` (against BibTeX IDs/titles) and falls back to fuzzy title/author matching from embedded PDF metadata.
 
 3.  **Metadata Normalization**
     The matched BibTeX entry is processed by the `normalize_meta` function to clean and standardize the metadata (e.g., title, authors, year).
 
 4.  **Enriched JSON Export**  
-    Combine the raw annotations and the normalized metadata into a single, structured JSON file. This file will contain a `meta` section for the document-level data and a `data` section for the list of individual highlights.
+    Combine the raw annotations and the normalized metadata into a single, structured JSON file. This file contains a `meta` section for the document-level data and a `data` section for individual highlights. Annotation `text` and `note` are sanitized (CR/LF normalized, HTML entities unescaped, zero‑width and soft hyphens removed, whitespace collapsed, and newlines joined to spaces). JSON is written with `ensure_ascii=False`.
 
 5.  **Final Export Generation**  
     Use the enriched JSON file as the single source of truth to generate the final output files:
@@ -94,14 +94,17 @@ Extracts highlight annotations from a PDF file, returning a list of `Annotation`
 ### `load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase`  
 Loads and parses a BibTeX file into an internal database structure for efficient lookup.
 
-### `find_bibtex_entry(pdf_title: str, pdf_authors: List[str], bib_database: bibtexparser.bibdatabase.BibDatabase, title_threshold: int = 80, author_threshold: int = 80) -> Optional[Dict[str, Any]]`  
-Finds the best matching BibTeX entry for a given PDF based on title and author similarity.
+### `find_bibtex_entry_by_basename(base_filename: str, bib_database: BibDatabase, ...)`  
+Matches using the PDF filename (e.g., `Title_Authors_Year`) against BibTeX entry IDs and titles using fuzzy matching.
+
+### `find_bibtex_entry(pdf_title: str, pdf_authors: List[str], bib_database: BibDatabase, title_threshold: int = 80, author_threshold: int = 80)`  
+Fallback matcher based on embedded PDF title and authors.
 
 ### `normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]`
 Centralizes the cleaning and normalization of metadata from a BibTeX entry. This includes standardizing titles, authors, editors, and other fields to ensure consistency across all export formats.
 
 ### `create_enriched_json(pdf_path: str, bib_path: str, output_path: str)`
-Orchestrates the extraction, enrichment, and export of annotations to an enriched JSON file.
+Orchestrates extraction and enrichment; sanitizes `text` and `note` (newline join, HTML unescape, space normalization) and writes JSON with `ensure_ascii=False`.
 
 ### `create_readwise_csv(json_path: str, output_path: str)`
 Creates a Readwise-ready CSV file from an enriched JSON file.
@@ -113,30 +116,19 @@ Creates a Markdown file from an enriched JSON file.
 
 ## Matching Strategy
 
-The matching between PDF metadata and BibTeX entries uses a stepwise heuristic:
+The tool prefers filename-based matching, with fuzzy similarity and robust normalization, and falls back to embedded metadata when needed:
 
-1. **Filename Parsing**  
-   Extract author(s), year, and title fragments from the PDF filename.
+1. **Filename-first**  
+   Compare the PDF base name against BibTeX `ID` and `title` via token-set fuzzy matching. The filename schema is assumed to be `Title_Authors_Year` from the reference manager. Normalization collapses separators (`_`, `-`, `.`) into spaces and lowercases for comparison.
 
-2. **Title Similarity**  
-   Compute string similarity (e.g., Levenshtein or fuzzy matching) between extracted title and BibTeX titles.
+2. **Embedded metadata fallback**  
+   If no match via filename, compute fuzzy similarity between the embedded PDF `Title` and parsed `Author` list (normalized initials, multi-part surnames) versus BibTeX entries.
 
-3. **Author Overlap**  
-   Compare parsed authors with BibTeX author lists for overlap and ordering.
+3. **Normalization**  
+   BibTeX titles are normalized by standardizing separators (colon, hyphen, em dash) to space–en dash–space and collapsing whitespace to improve match stability and alias generation.
 
-4. **Year Check**  
-   Confirm that the publication year matches or is within a small tolerance.
-
-5. **DOI Matching**  
-   If available, compare DOI fields for exact matches.
-
-6. **Fallbacks**  
-   Use partial title matches or truncated author lists for ambiguous cases.
-
-7. **Truncation Handling**  
-   Handle incomplete or abbreviated filenames gracefully.
-
-The goal is to maximize precision while allowing for minor inconsistencies in naming conventions.
+4. **Warnings**  
+   If no match is found, JSON export succeeds with partial metadata and a console warning; the summary dialog classifies JSON as `warning`.
 
 ---
 
@@ -204,12 +196,12 @@ Each row corresponds to one annotation, enriched with metadata for seamless impo
 
 ## Markdown Export Notes
 
-- Output includes a header with bibliographic metadata (title, authors, year, DOI).
+- Output includes a YAML header with bibliographic metadata (title, authors, year, DOI, citation key, aliases) followed by an H1 `# Highlights for [[@{citation_key}]]` (or `# Highlights` if no key).
 - Each annotation is listed with:
   - Highlight text
   - Page number
   - Highlight color (if available)
-  - User notes
+  - User notes rendered as a memo block when present and not a verbatim duplicate of the highlight text (whitespace-insensitive)
 - Formatting placeholders allow for future styling and linking.
 - Markdown is compatible with note-taking apps such as Obsidian.
 
