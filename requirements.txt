@@ -3,3 +3,4 @@ pydantic
 bibtexparser
 thefuzz[speedup]
 PyYAML
+latexcodec

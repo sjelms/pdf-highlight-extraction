@@ -9,19 +9,40 @@ from typing import List, Optional, Dict, Any
 
 def load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase:
     """
-    Loads and parses a BibTeX file.
+    Loads and parses a BibTeX/BibLaTeX file.
+
+    Uses latexcodec when available to decode LaTeX accents and macros to
+    Unicode for better downstream handling.
 
     Args:
-        bibtex_path: The path to the BibTeX file.
+        bibtex_path: The path to the BibTeX/BibLaTeX file.
 
     Returns:
         A BibTexDatabase object.
     """
-    with open(bibtex_path, 'r', encoding='utf-8') as bibtex_file:
+    # Try to register latexcodec (no-op if unavailable)
+    try:
+        import latexcodec  # type: ignore  # noqa: F401
+    except Exception:
+        pass
+
+    # Prefer the 'latex' codec if registered; otherwise fall back to utf-8
+    for enc in ("latex", "utf-8"):
+        try:
+            with open(bibtex_path, 'r', encoding=enc) as bibtex_file:
+                parser = BibTexParser(common_strings=True)
+                parser.customization = convert_to_unicode
+                bib_database = bibtexparser.load(bibtex_file, parser=parser)
+                return bib_database
+        except LookupError:
+            # 'latex' codec not available; try next
+            continue
+    # Final fallback: open default and parse
+    with open(bibtex_path, 'r') as bibtex_file:
         parser = BibTexParser(common_strings=True)
         parser.customization = convert_to_unicode
         bib_database = bibtexparser.load(bibtex_file, parser=parser)
-    return bib_database
+        return bib_database
 
 import re
 
@@ -211,8 +232,8 @@ def normalize_meta(entry: Dict[str, Any]) -> Dict[str, Any]:
     short_title_split = re.split(r'[:–-]', raw_title)
     short_title = short_title_split[0].strip() if short_title_split else title
 
-    # Extract year: keep only 4-digit year if present
-    year = entry.get('year', '')
+    # Extract year (BibTeX: 'year'; BibLaTeX: often 'date' like YYYY or YYYY-MM-DD)
+    year = entry.get('year', '') or entry.get('date', '')
     match_year = re.search(r'\b(\d{4})\b', year)
     year_clean = match_year.group(1) if match_year else year
 

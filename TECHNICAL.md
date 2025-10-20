@@ -51,6 +51,7 @@ pip install -r requirements.txt
 - bibtexparser
 - thefuzz[speedup]
 - PyYAML
+- latexcodec
 
 
 ### 3. Configure Paths
@@ -92,7 +93,7 @@ The pipeline proceeds as follows:
 Extracts highlight annotations from a PDF file, returning a list of `Annotation` objects. The extracted text is cleaned to remove single line breaks, creating flowing paragraphs.
 
 ### `load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase`  
-Loads and parses a BibTeX file into an internal database structure for efficient lookup.
+Loads and parses a BibTeX/BibLaTeX file, decoding LaTeX accents/macros via latexcodec when available, into an internal database structure for efficient lookup.
 
 ### `find_bibtex_entry_by_basename(base_filename: str, bib_database: BibDatabase, ...)`  
 Matches using the PDF filename (e.g., `Title_Authors_Year`) against BibTeX entry IDs and titles using fuzzy matching.
@@ -471,3 +472,9 @@ python pdf-highlight-extraction.py /path/to/your/file.pdf --no-csv
 
 ### 5. Update `pdf-highlight-extraction.py`:
 - [x] Add CLI switches for flexible execution.
+
+
+- 2025-10-20
+  - Add BibLaTeX support: `load_bibtex` now attempts LaTeX decoding via `latexcodec` to convert LaTeX accents/macros to Unicode, with safe fallback to UTF-8 when unavailable.
+  - Year normalization: `normalize_meta` now derives `year` from BibLaTeX `date` (YYYY or YYYY-MM-DD) when `year` is missing.
+  - Documentation: Updated README and TECHNICAL docs to reference BibTeX/BibLaTeX and include `latexcodec` in requirements.

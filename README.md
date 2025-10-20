@@ -1,6 +1,6 @@
 # pdf-highlight-extraction
 
-Extract, enrich, and export PDF highlights to Readwise-ready CSV and Markdown with BibTeX-powered metadata.
+Extract, enrich, and export PDF highlights to Readwise-ready CSV and Markdown with BibTeX/BibLaTeX-powered metadata.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The pipeline’s single source of truth is an enriched JSON file per PDF that co
 ## Features
 
 - Quad-based highlight extraction using PyMuPDF (reliable text capture from highlighted quadpoints)
-- BibTeX integration with filename-first matching, fuzzy fallbacks, and normalization
+- BibTeX/BibLaTeX integration with filename-first matching, fuzzy fallbacks, and normalization
 - Robust author/editor parsing (supports “Last, First” format, multiline `and` separators, initials, and multi-part surnames like “LaScola Needy”)
 - Markdown export with Obsidian-friendly YAML front matter, H1 header, aliases, and color tags
 - Readwise CSV export following the official template
@@ -29,6 +29,7 @@ The pipeline’s single source of truth is an enriched JSON file per PDF that co
     - bibtexparser
     - thefuzz[speedup]
     - PyYAML
+    - latexcodec
 
 ## Setup
 
@@ -41,7 +42,7 @@ pip install -r requirements.txt
 ## Configure
 
 Edit `config.yaml` to set paths relative to the project root:
-- `bibtex_path`: path to your BibTeX file (e.g., `paperpile.bib`)
+- `bibtex_path`: path to your BibTeX/BibLaTeX file (e.g., `paperpile.bib`)
 - `json_output_dir`: directory for enriched JSON
 - `csv_output_dir`: directory for Readwise CSV
 - `md_output_dir`: directory for Markdown
@@ -98,6 +99,8 @@ Columns (in order): `Title, Author, Category, Source URL, Highlight, Note, Locat
 
 ## What’s New
 
+- Support BibLaTeX entries and decode LaTeX accents/macros via latexcodec
+- Derive publication year from BibLaTeX `date` when `year` is missing
 - Prefer filename-based BibTeX matching; fallback to PDF metadata fuzzy match
 - Add H1 header in Markdown: `# Highlights for [[@{citation_key}]]`
 - Improve `aliases`: include full title and optional short title (derived before dash/colon); de-duplicate
