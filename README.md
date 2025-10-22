@@ -1,4 +1,4 @@
-# pdf-highlight-extraction
+# PDF Highlight Extraction Script
 
 Extract, enrich, and export PDF highlights to Readwise-ready CSV and Markdown with BibTeX/BibLaTeX-powered metadata.
 
