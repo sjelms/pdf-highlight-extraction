@@ -55,9 +55,15 @@ def show_final_dialog(
     )
 
     try:
-        subprocess.run(["osascript", "-e", applescript], check=False)
+        result = subprocess.run(
+            ["osascript", "-e", applescript],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "osascript failed")
     except Exception:
         # Fallback: just print to terminal
         print("\n=== PDF Highlight Extraction Summary ===\n")
         print(body)
-

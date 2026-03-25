@@ -26,7 +26,9 @@ def load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase:
     except Exception:
         pass
 
-    # Prefer the 'latex' codec if registered; otherwise fall back to utf-8
+    # Prefer the 'latex' codec if registered; otherwise fall back to utf-8.
+    # Some recent latexcodec/Python combinations raise ValueError wrapping a
+    # UnicodeDecodeError when the .bib already contains native UTF-8 characters.
     for enc in ("latex", "utf-8"):
         try:
             with open(bibtex_path, 'r', encoding=enc) as bibtex_file:
@@ -34,8 +36,8 @@ def load_bibtex(bibtex_path: str) -> bibtexparser.bibdatabase.BibDatabase:
                 parser.customization = convert_to_unicode
                 bib_database = bibtexparser.load(bibtex_file, parser=parser)
                 return bib_database
-        except LookupError:
-            # 'latex' codec not available; try next
+        except (LookupError, UnicodeError, ValueError):
+            # Codec unavailable or unable to decode the file; try next.
             continue
     # Final fallback: open default and parse
     with open(bibtex_path, 'r') as bibtex_file:
